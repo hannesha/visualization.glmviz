@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="visualization.glmviz" name="glmviz" version="0.0.0" provider-name="J0hn">
+
+  <extension point="xbmc.player.musicviz" library_linux="visualization.glmviz.so">
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_gb">testing</summary>
+    <description lang="en_gb">glmviz kodi port</description>
+    <disclaimer lang="en_gb"></disclaimer>
+    <language></language>
+    <platform>linux</platform>
+    <license>GPL 3</license>
+    <forum></forum>
+    <website></website>
+    <email></email>
+    <source></source>
+    <news></news>
+    <assets>
+        <icon></icon>
+        <fanart></fanart>
+        <screenshot></screenshot>
+    </assets>
+  </extension>
+</addon>
