@@ -23,6 +23,7 @@
 #include <fftw3.h>
 
 #include <vector>
+#include <complex>
 
 #include "Buffer.hpp"
 
@@ -45,7 +46,7 @@ class FFT {
 		void magnitudes(std::vector<float>&, float);
 		size_t output_size();
 
-		fftwf_complex* output;
+		std::complex<float>* output;
 	private:
 		float* input;
 		fftwf_plan plan;

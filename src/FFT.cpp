@@ -43,10 +43,15 @@ namespace Window{
 	};
 }
 
+template <typename T>
+size_t ptr_sizeof(T t){
+	return sizeof(typename std::remove_pointer<decltype(t)>::type);
+}
+
 FFT::FFT(const size_t fft_size): size(fft_size){
-	input = reinterpret_cast<float*>(fftwf_malloc(sizeof(float) * size));
-	output = reinterpret_cast<fftwf_complex*>(fftwf_malloc(sizeof(fftwf_complex) * output_size()));
-	plan = fftwf_plan_dft_r2c_1d(size, input, output, FFTW_ESTIMATE);
+	input = reinterpret_cast<decltype(input)>(fftwf_malloc(ptr_sizeof(input) * size));
+	output = reinterpret_cast<decltype(output)>(fftwf_malloc(ptr_sizeof(output) * output_size()));
+	plan = fftwf_plan_dft_r2c_1d(size, input, reinterpret_cast<fftwf_complex*>(output), FFTW_ESTIMATE);
 }
 
 FFT::FFT(FFT&& f){
@@ -78,10 +83,9 @@ void FFT::resize(const size_t nsize){
 		fftwf_free(output);
 
 		// create new plan and allocate memory
-		input = reinterpret_cast<float*>(fftwf_malloc(sizeof(float) * size));
-		size_t output_size = size/2+1;
-		output = reinterpret_cast<fftwf_complex*>(fftwf_malloc(sizeof(fftwf_complex) * output_size));
-		plan = fftwf_plan_dft_r2c_1d(size, input, output, FFTW_ESTIMATE);
+		input = reinterpret_cast<decltype(input)>(fftwf_malloc(ptr_sizeof(input) * size));
+		output = reinterpret_cast<decltype(output)>(fftwf_malloc(ptr_sizeof(output) * output_size()));
+		plan = fftwf_plan_dft_r2c_1d(size, input, reinterpret_cast<fftwf_complex*>(output), FFTW_ESTIMATE);
 	}
 }
 
@@ -151,7 +155,7 @@ size_t FFT::max_bin(const size_t start, const size_t stop){
 	size_t ret = startl;
 	float max = 0;
 	for(size_t i = startl; i < stopl; i++){
-		float mag = std::hypot(output[i][0], output[i][1]);
+		float mag = std::abs(output[i]);
 		if(mag > max){
 			max = mag;
 			ret = i;
@@ -169,9 +173,10 @@ void FFT::magnitudes(std::vector<float>& mag, const float max_amplitude){
 	}
 
 	float scale = 1.f/ ((float)(window.size()/2 +1) * max_amplitude);
+	float scale_l = std::log10(scale);
 
 	for(unsigned i = 0; i < size/2+1; i++){
-		mag[i] = 20.f * std::log10(std::hypot(output[i][0], output[i][1]) * scale);
+		mag[i] = 20.f * (std::log10(std::abs(output[i])) + scale_l);
 	}
 }
 

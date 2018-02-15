@@ -110,7 +110,7 @@ void Spectrum::resize_x_buffer(const size_t size){
 
 void Spectrum::update_fft(FFT& fft){
 	b_fft.bind(GL_TEXTURE_BUFFER);
-	glBufferSubData(GL_TEXTURE_BUFFER, 0, output_size * sizeof(fftwf_complex), fft.output[offset]);
+	glBufferSubData(GL_TEXTURE_BUFFER, 0, output_size * sizeof(float[2]), reinterpret_cast<float*>(fft.output + offset));
 	GL::Buffer::unbind(GL_TEXTURE_BUFFER);
 }
 
@@ -124,14 +124,14 @@ void Spectrum::update_fft(std::vector<FFT>& ffts){
 
 void Spectrum::update_fft(std::vector<float>& fft_data){
 	b_fft.bind(GL_TEXTURE_BUFFER);
-	glBufferSubData(GL_TEXTURE_BUFFER, 0, output_size * sizeof(fftwf_complex), fft_data.data());
+	glBufferSubData(GL_TEXTURE_BUFFER, 0, output_size * sizeof(float[2]), fft_data.data());
 	GL::Buffer::unbind(GL_TEXTURE_BUFFER);
 	GL::get_error("update fft buffer");
 }
 
 void Spectrum::resize_fft_buffer(const size_t size){
 	b_fft.bind(GL_TEXTURE_BUFFER);
-	glBufferData(GL_TEXTURE_BUFFER, output_size * sizeof(fftwf_complex), 0, GL_DYNAMIC_DRAW);
+	glBufferData(GL_TEXTURE_BUFFER, output_size * sizeof(std::complex<float>), 0, GL_DYNAMIC_DRAW);
 	GL::Buffer::unbind(GL_TEXTURE_BUFFER);
 	GL::get_error("resize fft buffer");
 }
