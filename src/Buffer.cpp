@@ -155,7 +155,7 @@ float Buffer<T>::rms(){
 
 // calculates start and length of a slice
 template<typename T>
-void Buffer<T>::get_slice(const unsigned steps, const unsigned slice_length, unsigned& length, unsigned& start){
+void Buffer<T>::get_slice(const unsigned steps, const unsigned slice_length, unsigned& start, unsigned& length){
 	unsigned step = slice_length/steps;
 	start = std::min(step * age, step * (steps -1));
 	length = size - (step * (steps - 1));

@@ -46,7 +46,7 @@ class Buffer {
 
 		unsigned get_age() const{ return age; }
 		void increment_age(){ age++; }
-		void get_slice(unsigned steps, unsigned slice_length, unsigned& length, unsigned& start);
+		void get_slice(unsigned steps, unsigned slice_length, unsigned& start, unsigned& length);
 
 	private:
 		std::mutex m;
