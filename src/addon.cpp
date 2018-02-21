@@ -3,7 +3,7 @@
 #include <cmath>
 #include "Oscilloscope.hpp"
 #include "Triangle.hpp"
-#include "Spectrum.hpp"
+#include "Spectrum2.hpp"
 
 class CGLMViz : public kodi::addon::CAddonBase,
 						 public kodi::addon::CInstanceVisualization{
@@ -27,6 +27,8 @@ private:
 	std::vector<Oscilloscope> osc;
 	std::vector<Spectrum> spectra;
 	std::vector<FFT> ffts;
+	std::vector<float> fft_magn;
+	std::vector<float> spec_gravity;
 	//std::vector<float> fft_old, fft_avg;
 	std::vector<Triangle> t;
 	unsigned buffer_age = 0;
@@ -44,6 +46,7 @@ CGLMViz::~CGLMViz(){
 ADDON_STATUS CGLMViz::Create(){
 	const unsigned fft_size = 4096;
 	const unsigned buffer_size = 2204;
+	const unsigned ouput_size = 100;
 
 	const unsigned data_size = std::min(fft_size, buffer_size);
 	//std::cout << "samples:" << samplesPerSec << std::endl;
@@ -55,6 +58,7 @@ ADDON_STATUS CGLMViz::Create(){
 	osc.emplace_back(tmp, 0);
 	t.emplace_back();
 
+	spec_gravity.resize(ouput_size * 2);
 	//fft_old.resize(4069);
 	ffts.emplace_back(fft_size);
 
@@ -63,7 +67,7 @@ ADDON_STATUS CGLMViz::Create(){
 	spec.gravity = 7;
 	spec.top_color = {1., 1., 1., 1.};
 	spec.bot_color = {0.5, 0.5, 0.5, 1.};
-	spec.output_size = 100;
+	spec.output_size = ouput_size;
 	// set aspect ratio
 	spec.pos.Xmin = -ratio();
 	spec.pos.Xmax = ratio();
@@ -73,7 +77,7 @@ ADDON_STATUS CGLMViz::Create(){
 	spec.slope = -2.0 / (min_n - max_n);
 	spec.offset = 1.0 - spec.slope * max_n;
 
-	spectra.emplace_back(spec, 0);
+	spectra.emplace_back(spec);
 	//std::cout << osc.size() << std::endl;
 	return ADDON_STATUS_OK;
 }
@@ -142,14 +146,19 @@ void CGLMViz::Render(){
 	t[0].draw();
 	//auto lock = baudio[0].lock();
 	const unsigned step_interval = 3; // slice buffer 3 times per update
+	const float gravity = 0.1f;
+
+	// set min/max dB, calculate normalization parameters
+	const float max_n = -5 * 0.05f;
+	const float min_n = -60 * 0.05f;
+	const float slope = -2.f / (min_n - max_n);
+	const float offset = 1.f - slope * max_n;
+
 	if(baudio[0].get_age() > step_interval){
 		// audio buffer is too old
 		//std::cout << "Buffer age :" << buffer_age << std::endl;
 	}
 
-	// slice buffer
-	unsigned start, buf_length;
-	baudio[0].get_slice(step_interval, kodi_buffer_len/2, start, buf_length);
 	//unsigned step = (kodi_buffer_len/2)/step_interval;
 	//unsigned start = std::min(step * baudio[0].get_age(), step * (step_interval -1));
 	//std::cout << "start :" <<start << std::endl;
@@ -165,6 +174,7 @@ void CGLMViz::Render(){
 //
 //
 //	osc[0].draw(start, draw_len);
+	//std::cout << "start :" << start << "buf_len: " << buf_length<< std::endl;
 
 
 	// FFT smoothing (for future use)
@@ -178,16 +188,42 @@ void CGLMViz::Render(){
 //		fft_avg[i+1] = ffts[0].output[i/2][1] * mix + fft_old[i+1] * mix1;
 //	}
 
-	// update buffer slice
-	//auto lock = baudio[0].lock();
-	ffts[0].calculate(baudio[0].v_buffer, start, buf_length);
+	// limit buffer slice recalculation if the buffer is too old
+	if(baudio[0].get_age() <= step_interval){
+		// slice buffer
+		unsigned start, buf_length;
+		baudio[0].get_slice(step_interval, kodi_buffer_len/2, start, buf_length);
 
-	spectra[0].update_fft(ffts[0]);
+		// update buffer slice
+		//auto lock = baudio[0].lock();
+
+		ffts[0].calculate(baudio[0].v_buffer, start, buf_length);
+		ffts[0].magnitudes(fft_magn, 1.f);
+
+		// claculate bar gravity
+		for(unsigned i = 0; i < spec_gravity.size()/2; i++){
+			float y_old = spec_gravity[i*2] - gravity * spec_gravity[i*2 + 1]; // calculate gravity
+			float y = slope * fft_magn[i] + offset; // normalize fft output
+			if(y_old > y){
+				// apply gravity, keep old value
+				fft_magn[i] = y_old;
+				spec_gravity[i*2] = y_old;
+				spec_gravity[i*2 + 1] += 0.016f; // add dt
+			}else{
+				// use new value, reset time
+				fft_magn[i] = y;
+				spec_gravity[i*2] = y;
+				spec_gravity[i*2 + 1] = 0;
+			}
+		}
+
+		spectra[0].update_bars(fft_magn);
+		// increment buffer age for the next frame
+		baudio[0].increment_age();
+	}
 
 	spectra[0].draw(0.016);
 
-	// increment buffer age for the next frame
-	baudio[0].increment_age();
 }
 
 ADDONCREATOR(CGLMViz)

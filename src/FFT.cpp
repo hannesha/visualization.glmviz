@@ -172,11 +172,12 @@ void FFT::magnitudes(std::vector<float>& mag, const float max_amplitude){
 		mag.resize(output_size());
 	}
 
-	float scale = 1.f/ ((float)(window.size()/2 +1) * max_amplitude);
+	float scale = 1.f/ ((float)(window.size()) * max_amplitude);
 	float scale_l = std::log10(scale);
 
 	for(unsigned i = 0; i < size/2+1; i++){
-		mag[i] = 20.f * (std::log10(std::abs(output[i])) + scale_l);
+		//mag[i] = 20.f * (std::log10(std::abs(output[i])) + scale_l);
+		mag[i] = std::log10(std::abs(output[i])) + scale_l;
 	}
 }
 
