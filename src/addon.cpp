@@ -1,9 +1,14 @@
 #include <kodi/addon-instance/Visualization.h>
+#include <kodi/Filesystem.h>
 #include <iostream>
 #include <cmath>
 #include "Oscilloscope.hpp"
 #include "Triangle.hpp"
 #include "Spectrum2.hpp"
+#include <algorithm>
+#include <iterator>
+#include "Image.hpp"
+#include "TexSprite.hpp"
 
 class CGLMViz : public kodi::addon::CAddonBase,
 						 public kodi::addon::CInstanceVisualization{
@@ -17,6 +22,7 @@ public:
 	void AudioData(const float* audioData, int audioDataLength, float* freqData, int freqDataLength) override;
 	void Render() override;
 	void GetInfo(bool& wantsFreq, int& syncDelay) override;
+	bool UpdateAlbumart(std::string albumart) override;
 	float ratio(){return static_cast<float>(Width())/Height();}
 
 	bool GetPresets(std::vector<std::string>&) override;
@@ -30,7 +36,8 @@ private:
 	std::vector<float> fft_magn;
 	std::vector<float> spec_gravity;
 	//std::vector<float> fft_old, fft_avg;
-	std::vector<Triangle> t;
+	//std::vector<Triangle> t;
+	std::vector<TexSprite> sprites;
 	unsigned buffer_age = 0;
 	unsigned kodi_buffer_len = 1;
 };
@@ -56,7 +63,7 @@ ADDON_STATUS CGLMViz::Create(){
 	tmp.scale = 1.5;
 	baudio.emplace_back(buffer_size);
 	osc.emplace_back(tmp, 0);
-	t.emplace_back();
+	//t.emplace_back();
 
 	spec_gravity.resize(ouput_size * 2);
 	//fft_old.resize(4069);
@@ -66,11 +73,11 @@ ADDON_STATUS CGLMViz::Create(){
 	spec.scale = 1.f/data_size;
 	spec.gravity = 7;
 	spec.top_color = {1., 1., 1., 1.};
-	spec.bot_color = {0.5, 0.5, 0.5, 1.};
+	spec.bot_color = {1., 1., 1., 1.};
 	spec.output_size = ouput_size;
 	// set aspect ratio
-	spec.pos.Xmin = -ratio();
-	spec.pos.Xmax = ratio();
+	//spec.pos.Xmin = -ratio();
+	//spec.pos.Xmax = ratio();
 
 	float max_n = -10 * 0.05;
 	float min_n = -60 * 0.05;
@@ -79,6 +86,16 @@ ADDON_STATUS CGLMViz::Create(){
 
 	spectra.emplace_back(spec);
 	//std::cout << osc.size() << std::endl;
+
+	try{
+		//std::ostringstream s_path;
+		//s_path << Presets() << "/resources/" << "test.png";
+
+		sprites.emplace_back();
+		sprites[0].set_screen_ratio(Width(), Height());
+	}catch(std::exception& e){
+		std::cerr << e.what() << std::endl;
+	}
 	return ADDON_STATUS_OK;
 }
 
@@ -92,13 +109,43 @@ void CGLMViz::GetInfo(bool& wantsFreq, int& syncDelay){
 	syncDelay = 0;
 }
 
+bool CGLMViz::UpdateAlbumart(std::string albumart){
+	kodi::vfs::CFile f;
+	bool success = f.OpenFile(albumart);
+	if(!success){
+		return false;
+	}
+
+	ssize_t len = f.GetLength();
+	if(len <= 0){
+		return false;
+	}
+
+	std::cout << "len: " << len << std::endl;
+	std::cout << "albumart: " << albumart << std::endl;
+	std::vector<unsigned char> imgdata(len);
+	ssize_t read = f.Read(imgdata.data(), len);
+	if(read <= 0){
+		return false;
+	}
+	std::cout << "bytes read: " << read << std::endl;
+	try{
+		Image img(imgdata);
+		std::cout << "height: " << img.height << " width: " << img.width << " channels: " << img.channels << std::endl;
+		sprites[0].update_texture(img);
+	}catch(std::runtime_error& e){
+		std::cerr << e.what() << std::endl;
+	}
+
+	return true;
+}
+
 bool CGLMViz::Start(int channels, int samplesPerSec, int bitsPerSample, std::string songName){
 	std::cout << "starting!" << std::endl;
 	return true;
 }
 
 void CGLMViz::Stop(){
-
 	std::cout << "stopping!" << std::endl;
 }
 
@@ -139,20 +186,31 @@ void CGLMViz::AudioData(const float* audioData, int audioDataLength, float* freq
 	kodi_buffer_len = audioDataLength;
 }
 
+float calc_slope(const float in_min, const float in_max, const float out_min, const float out_max){
+	// calculates the slope of a linear range map
+	return (out_max - out_min) / (in_max - in_min);
+}
+
+float calc_offset(const float in_x, const float out_x, const float slope){
+	// calculates the offset of a linear range map
+	return out_x - slope * in_x;
+}
+
 void CGLMViz::Render(){
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	t[0].draw();
+	//t[0].draw();
 	//auto lock = baudio[0].lock();
 	const unsigned step_interval = 3; // slice buffer 3 times per update
 	const float gravity = 0.1f;
 
 	// set min/max dB, calculate normalization parameters
-	const float max_n = -5 * 0.05f;
+	const float max_n = 0 * 0.05f;
 	const float min_n = -60 * 0.05f;
-	const float slope = -2.f / (min_n - max_n);
-	const float offset = 1.f - slope * max_n;
+	const float slope = calc_slope(min_n, max_n, -1, 1);
+	const float offset = calc_offset(max_n, 1, slope);
+	//std::cout << "slope: " << slope << " offset: " << offset << std::endl;
 
 	if(baudio[0].get_age() > step_interval){
 		// audio buffer is too old
@@ -217,12 +275,20 @@ void CGLMViz::Render(){
 			}
 		}
 
+		float max_amplitude = *std::max_element(fft_magn.begin(), fft_magn.begin() + 15);
+		//std::cout << max_amplitude << std::endl;
+
 		spectra[0].update_bars(fft_magn);
 		// increment buffer age for the next frame
 		baudio[0].increment_age();
+
+		//sprites[0].rotate(max_amplitude/3.f);
+		sprites[0].update((max_amplitude + 0.3)/2.f);
 	}
+	sprites[0].draw();
 
 	spectra[0].draw(0.016);
+
 
 }
 

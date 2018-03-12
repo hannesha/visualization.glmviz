@@ -22,11 +22,11 @@
 #define GL_GLEXT_PROTOTYPES
 #include <GL/glcorearb.h>
 
-//#ifndef NDEBUG
+#ifndef NDEBUG
 #include <vector>
 #include <string>
 #include <iostream>
-//#endif
+#endif
 namespace GL {
 	// VBO RAII wrapper
 	class Buffer{
@@ -73,7 +73,7 @@ namespace GL {
 				glShaderSource(id, 1, &code, nullptr);
 				glCompileShader(id);
 
-//#ifndef NDEBUG
+#ifndef NDEBUG
 				GLint status;
 				glGetShaderiv(id, GL_COMPILE_STATUS, &status);
 				if(status == GL_FALSE){
@@ -86,7 +86,7 @@ namespace GL {
 					std::string err(log.begin(), log.end());
 					std::cout << err << std::endl;
 				}
-//#endif
+#endif
 			};
 			inline ~Shader(){ glDeleteShader(id); };
 			// disable copying

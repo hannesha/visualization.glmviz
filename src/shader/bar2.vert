@@ -31,6 +31,7 @@ void main () {
 
 	float t = id * length_1;
 	vec2 circle_pos = vec2(-sin(pi_2 * t), cos(pi_2 * t));
-	gl_Position = vec4(circle_pos, y_clamp + 0.5, 1.0);
+	//gl_Position = vec4(circle_pos, y_clamp + 0.5, 1.0);
+	gl_Position = vec4(x, 1.0, y_clamp - 0.5, 1.0);
 }
 )"

@@ -46,7 +46,7 @@ namespace GL {
 
 	void get_error(const char* str){
 		GLenum err = glGetError();
-		char* err_str = nullptr;
+		std::string err_str = "";
 		switch (err){
 			case GL_INVALID_OPERATION:
 				err_str = "INVALID_OPERATION";
